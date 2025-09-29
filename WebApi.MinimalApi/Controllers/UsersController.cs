@@ -21,12 +21,19 @@ public class UsersController : Controller
     }
     
     [HttpGet("{userId}", Name = nameof(GetUserById))]
+    [HttpHead("{userId}")]
     public ActionResult<UserDto> GetUserById([FromRoute] Guid userId)
     {
         var user = _userRepository.FindById(userId);
         if (user == null)
             return NotFound();
-        
+
+        if (HttpMethods.IsHead(Request.Method))
+        {
+            Response.Headers.ContentType = "application/json; charset=utf-8";
+            return Ok();
+        }
+
         var userDto = _mapper.Map<UserDto>(user);
         return Ok(userDto);
     }
@@ -71,6 +78,17 @@ public class UsersController : Controller
                 value: updatedUser.Id);
         }
 
+        return NoContent();
+    }
+
+    [HttpDelete("{userId:guid}")]
+    public IActionResult RemoveUser([FromRoute] Guid userId)
+    {
+        var userEntity = _userRepository.FindById(userId);
+        if (userEntity == null)
+            return NotFound();
+
+        _userRepository.Delete(userId);
         return NoContent();
     }
 }
