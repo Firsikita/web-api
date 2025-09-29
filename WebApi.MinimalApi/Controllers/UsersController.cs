@@ -11,21 +11,23 @@ namespace WebApi.MinimalApi.Controllers;
 [Produces("application/json", "application/xml")]
 public class UsersController : Controller
 {
-    private readonly IMapper _mapper;
-    private readonly IUserRepository _userRepository;
+    private readonly IMapper mapper;
+    private readonly IUserRepository userRepository;
+    private readonly LinkGenerator linkGenerator;
     
     // Чтобы ASP.NET положил что-то в userRepository требуется конфигурация
-    public UsersController(IUserRepository userRepository, IMapper mapper)
+    public UsersController(IUserRepository userRepository, IMapper mapper, LinkGenerator linkGenerator)
     {
-        _userRepository = userRepository;
-        _mapper = mapper;
+        this.userRepository = userRepository;
+        this.mapper = mapper;
+        this.linkGenerator = linkGenerator;
     }
     
-    [HttpGet("{userId}", Name = nameof(GetUserById))]
-    [HttpHead("{userId}")]
+    [HttpGet("{userId:guid}", Name = nameof(GetUserById))]
+    [HttpHead("{userId:guid}")]
     public ActionResult<UserDto> GetUserById([FromRoute] Guid userId)
     {
-        var user = _userRepository.FindById(userId);
+        var user = userRepository.FindById(userId);
         if (user == null)
             return NotFound();
 
@@ -35,7 +37,7 @@ public class UsersController : Controller
             return Ok();
         }
 
-        var userDto = _mapper.Map<UserDto>(user);
+        var userDto = mapper.Map<UserDto>(user);
         return Ok(userDto);
     }
 
@@ -49,16 +51,16 @@ public class UsersController : Controller
         if (!ModelState.IsValid)
             return UnprocessableEntity(ModelState);
         
-        var userToPost = _mapper.Map<UserEntity>(user);
+        var userToPost = mapper.Map<UserEntity>(user);
         
-        var value =  _userRepository.Insert(userToPost);
+        var value =  userRepository.Insert(userToPost);
         return CreatedAtRoute(
             nameof(GetUserById),
             new { userId = userToPost.Id },
             value.Id);
     }
     
-    [HttpPut("{userId}")]
+    [HttpPut("{userId:guid}")]
     public IActionResult UpdateUser([FromRoute] Guid userId, [FromBody] UserUpdateDto? userUpdateDto)
     {
         if (userUpdateDto == null || userId == Guid.Empty)
@@ -67,9 +69,9 @@ public class UsersController : Controller
         if (!ModelState.IsValid)
             return UnprocessableEntity(ModelState);
 
-        var updatedUser = _mapper.Map(userUpdateDto, new UserEntity(userId));
+        var updatedUser = mapper.Map(userUpdateDto, new UserEntity(userId));
 
-        _userRepository.UpdateOrInsert(updatedUser, out var isNewUser);
+        userRepository.UpdateOrInsert(updatedUser, out var isNewUser);
     
         if (isNewUser)
         {
@@ -82,18 +84,18 @@ public class UsersController : Controller
         return NoContent();
     }
 
-    [HttpPatch("{userId}")]
+    [HttpPatch("{userId:guid}")]
     public IActionResult PartiallyUpdateUser([FromRoute] Guid userId,
         [FromBody] JsonPatchDocument<UserUpdateDto>? patchDoc)
     {
         if (patchDoc == null)
             return BadRequest();
         
-        var user = _userRepository.FindById(userId);
+        var user = userRepository.FindById(userId);
         if (user == null)
             return NotFound();
         
-        var userToPatch = _mapper.Map<UserUpdateDto>(user);
+        var userToPatch = mapper.Map<UserUpdateDto>(user);
         
         patchDoc.ApplyTo(userToPatch, ModelState);
         
@@ -102,8 +104,8 @@ public class UsersController : Controller
         if (!ModelState.IsValid)
             return UnprocessableEntity(ModelState);
         
-        _mapper.Map(userToPatch, user);
-        _userRepository.Update(user);
+        mapper.Map(userToPatch, user);
+        userRepository.Update(user);
         
         return NoContent();
     }
@@ -111,11 +113,11 @@ public class UsersController : Controller
     [HttpDelete("{userId:guid}")]
     public IActionResult RemoveUser([FromRoute] Guid userId)
     {
-        var userEntity = _userRepository.FindById(userId);
+        var userEntity = userRepository.FindById(userId);
         if (userEntity == null)
             return NotFound();
 
-        _userRepository.Delete(userId);
+        userRepository.Delete(userId);
         return NoContent();
     }
     
