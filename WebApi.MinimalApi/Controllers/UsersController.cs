@@ -7,6 +7,7 @@ namespace WebApi.MinimalApi.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Produces("application/json", "application/xml")]
 public class UsersController : Controller
 {
     private readonly IMapper _mapper;
@@ -18,8 +19,7 @@ public class UsersController : Controller
         _userRepository = userRepository;
         _mapper = mapper;
     }
-
-    [Produces("application/json", "application/xml")]
+    
     [HttpGet("{userId}", Name = nameof(GetUserById))]
     public ActionResult<UserDto> GetUserById([FromRoute] Guid userId)
     {
@@ -34,13 +34,19 @@ public class UsersController : Controller
     [HttpPost]
     public IActionResult CreateUser([FromBody] UserToPostDto user)
     {
+        if (user == null)
+            return BadRequest();
+        if (string.IsNullOrEmpty(user.Login) || !user.Login.All(char.IsLetterOrDigit))
+            ModelState.AddModelError(nameof(user.Login), "Unallowed chars in Login");
+        if (!ModelState.IsValid)
+            return UnprocessableEntity(ModelState);
+        
         var userToPost = _mapper.Map<UserEntity>(user);
-        if (userToPost == null)
-            return UnprocessableEntity();
+        
         var value =  _userRepository.Insert(userToPost);
         return CreatedAtRoute(
             nameof(GetUserById),
             new { userId = userToPost.Id },
-            value);
+            value.Id);
     }
 }
