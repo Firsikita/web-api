@@ -49,4 +49,28 @@ public class UsersController : Controller
             new { userId = userToPost.Id },
             value.Id);
     }
+    
+    [HttpPut("{userId}")]
+    public IActionResult UpdateUser([FromRoute] Guid userId, [FromBody] UserUpdateDto? userUpdateDto)
+    {
+        if (userUpdateDto == null || userId == Guid.Empty)
+            return BadRequest();
+
+        if (!ModelState.IsValid)
+            return UnprocessableEntity(ModelState);
+
+        var updatedUser = _mapper.Map(userUpdateDto, new UserEntity(userId));
+
+        _userRepository.UpdateOrInsert(updatedUser, out var isNewUser);
+    
+        if (isNewUser)
+        {
+            return CreatedAtAction(
+                actionName: nameof(GetUserById),
+                routeValues: new { userId = updatedUser.Id },
+                value: updatedUser.Id);
+        }
+
+        return NoContent();
+    }
 }
