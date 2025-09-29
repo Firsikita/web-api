@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using WebApi.MinimalApi.Domain;
 using WebApi.MinimalApi.Models;
 
@@ -60,7 +61,7 @@ public class UsersController : Controller
             value.Id);
     }
     
-    [HttpPut("{userId:guid}")]
+    [HttpPut("{userId}")]
     public IActionResult UpdateUser([FromRoute] Guid userId, [FromBody] UserUpdateDto? userUpdateDto)
     {
         if (userUpdateDto == null || userId == Guid.Empty)
@@ -119,6 +120,40 @@ public class UsersController : Controller
 
         userRepository.Delete(userId);
         return NoContent();
+    }
+
+    [HttpGet(Name = "GetUsers")]
+    public IActionResult GetUsers([FromQuery] int? pageNumber, [FromQuery] int? pageSize)
+    {
+        var page = pageNumber.GetValueOrDefault(1);
+        var size = pageSize.GetValueOrDefault(10);
+
+        if (page < 1)
+            page = 1;
+        if (size < 1)
+            size = 1;
+        if (size > 20)
+            size = 20;
+        
+        var pageList = userRepository.GetPage(page, size);
+        
+        var prev = pageList.HasPrevious ? linkGenerator.GetUriByRouteValues(HttpContext, "GetUsers", new {pageNumber = page - 1, pageSize = size}) : null;
+        var next = pageList.HasNext ? linkGenerator.GetUriByRouteValues(HttpContext, "GetUsers", new {pageNumber = page + 1, pageSize = size}) : null;
+        
+        var paginationHeader = new
+        {
+            previousPageLink = prev,
+            nextPageLink = next,
+            totalCount = pageList.Count,
+            pageSize = pageList.PageSize,
+            currentPage = pageList.CurrentPage,
+            totalPages = pageList.TotalPages,
+        };
+        Response.Headers["X-Pagination"] = JsonConvert.SerializeObject(paginationHeader);
+
+        var users = mapper.Map<IEnumerable<UserDto>>(pageList);
+        
+        return Ok(users);
     }
     
     [HttpOptions]
